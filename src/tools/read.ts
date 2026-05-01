@@ -100,7 +100,10 @@ export function registerReadTools(server: McpServer): void {
       completeOperation(requestId);
 
       const data = result as CompleteAccountDataExport | null;
-      const accounts = data?.startingConditions?.accounts ?? [];
+      const accounts = [
+        ...(data?.today?.savingsAccounts ?? []),
+        ...(data?.today?.investmentAccounts ?? []),
+      ];
       return {
         content: [{ type: "text" as const, text: JSON.stringify(accounts, null, 2) }],
       };
@@ -227,7 +230,7 @@ export function registerReadTools(server: McpServer): void {
       const plans: Plan[] = data?.plans ?? [];
 
       const incomeEvents = plans.flatMap((plan) =>
-        (plan.incomeEvents ?? []).map((e) => ({
+        (plan.income?.events ?? []).map((e) => ({
           ...e,
           planId: plan.id,
           planName: plan.name,
@@ -235,7 +238,7 @@ export function registerReadTools(server: McpServer): void {
         })),
       );
       const expenseEvents = plans.flatMap((plan) =>
-        (plan.expenseEvents ?? []).map((e) => ({
+        (plan.expenses?.events ?? []).map((e) => ({
           ...e,
           planId: plan.id,
           planName: plan.name,

@@ -314,11 +314,11 @@ export function registerWriteTools(server: McpServer): void {
       const data = result as CompleteAccountDataExport | null;
       const existingPlans: Plan[] = data?.plans ?? [];
 
-      const newPlan: Plan = {
+      const newPlan = {
         id: randomUUID(),
         name: planName,
         ...storedPlanData,
-      };
+      } as Plan;
 
       const validation = validatePlan(newPlan);
       if (!validation.valid) {
