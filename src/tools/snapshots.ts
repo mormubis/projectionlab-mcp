@@ -12,6 +12,7 @@ import {
   loadSnapshot,
   saveSnapshot,
 } from "../lib/snapshots.js";
+import { validateExport } from "../lib/validation.js";
 import {
   completeOperation,
   createOperation,
@@ -168,6 +169,13 @@ export function registerSnapshotTools(server: McpServer): void {
         snapshotPath: string;
         snapshotData: CompleteAccountDataExport;
       };
+
+      // Validate snapshot data before restoring
+      const validation = validateExport(snapshotData);
+      if (!validation.valid) {
+        completeOperation(requestId);
+        return errorResult(`Snapshot validation failed: ${validation.errors.join("; ")}`);
+      }
 
       completeOperation(requestId);
 

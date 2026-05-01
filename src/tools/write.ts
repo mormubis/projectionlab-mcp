@@ -10,12 +10,11 @@ import {
 } from "../lib/plugin-api.js";
 import { saveSnapshot } from "../lib/snapshots.js";
 import {
-  advanceOperation,
   completeOperation,
   createOperation,
   getOperation,
 } from "../lib/state.js";
-import { validateAccount, validateAccountUpdate, validatePlan } from "../lib/validation.js";
+import { validateAccountUpdate, validatePlan } from "../lib/validation.js";
 import type { CompleteAccountDataExport, Plan } from "../types/projectionlab.js";
 
 function errorResult(message: string) {
@@ -66,6 +65,7 @@ const updateAccountsSchema = z.object({
 // ---------------------------------------------------------------------------
 const createPlanSchema = z.object({
   name: z.string().describe("Name for the new plan"),
+  planData: z.record(z.unknown()).optional().describe("Additional plan properties"),
   requestId: z.string().optional(),
   result: z.unknown().optional(),
 });
@@ -75,7 +75,7 @@ const createPlanSchema = z.object({
 // ---------------------------------------------------------------------------
 const updatePlanSchema = z.object({
   planId: z.string().describe("The unique plan ID to update"),
-  name: z.string().optional().describe("New plan name"),
+  updates: z.record(z.unknown()).describe("Properties to update on the plan"),
   requestId: z.string().optional(),
   result: z.unknown().optional(),
 });
@@ -277,7 +277,7 @@ export function registerWriteTools(server: McpServer): void {
       inputSchema: createPlanSchema,
     },
     async (args) => {
-      const { name, requestId, result } = args;
+      const { name, planData, requestId, result } = args;
 
       if (!requestId) {
         let key: string;
@@ -287,7 +287,7 @@ export function registerWriteTools(server: McpServer): void {
           return errorResult(err instanceof Error ? err.message : String(err));
         }
 
-        const opId = createOperation("pl_create_plan", { name });
+        const opId = createOperation("pl_create_plan", { name, planData });
         const seq = sequence("pl_create_plan", [exportStep(key)], { requestId: opId });
         return { content: [{ type: "text" as const, text: JSON.stringify(seq, null, 2) }] };
       }
@@ -306,7 +306,10 @@ export function registerWriteTools(server: McpServer): void {
         return errorResult(err instanceof Error ? err.message : String(err));
       }
 
-      const { name: planName } = op.data as { name: string };
+      const { name: planName, planData: storedPlanData } = op.data as {
+        name: string;
+        planData?: Record<string, unknown>;
+      };
 
       const data = result as CompleteAccountDataExport | null;
       const existingPlans: Plan[] = data?.plans ?? [];
@@ -314,6 +317,7 @@ export function registerWriteTools(server: McpServer): void {
       const newPlan: Plan = {
         id: randomUUID(),
         name: planName,
+        ...storedPlanData,
       };
 
       const validation = validatePlan(newPlan);
@@ -367,7 +371,7 @@ export function registerWriteTools(server: McpServer): void {
       inputSchema: updatePlanSchema,
     },
     async (args) => {
-      const { planId, name, requestId, result } = args;
+      const { planId, updates, requestId, result } = args;
 
       if (!requestId) {
         let key: string;
@@ -377,7 +381,7 @@ export function registerWriteTools(server: McpServer): void {
           return errorResult(err instanceof Error ? err.message : String(err));
         }
 
-        const opId = createOperation("pl_update_plan", { planId, name });
+        const opId = createOperation("pl_update_plan", { planId, updates });
         const seq = sequence("pl_update_plan", [exportStep(key)], { requestId: opId });
         return { content: [{ type: "text" as const, text: JSON.stringify(seq, null, 2) }] };
       }
@@ -396,9 +400,9 @@ export function registerWriteTools(server: McpServer): void {
         return errorResult(err instanceof Error ? err.message : String(err));
       }
 
-      const { planId: storedPlanId, name: newName } = op.data as {
+      const { planId: storedPlanId, updates: storedUpdates } = op.data as {
         planId: string;
-        name?: string;
+        updates: Record<string, unknown>;
       };
 
       const data = result as CompleteAccountDataExport | null;
@@ -412,7 +416,7 @@ export function registerWriteTools(server: McpServer): void {
 
       const updatedPlan: Plan = {
         ...existingPlans[planIndex],
-        ...(newName !== undefined ? { name: newName } : {}),
+        ...storedUpdates,
       };
 
       const validation = validatePlan(updatedPlan);
