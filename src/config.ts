@@ -1,6 +1,6 @@
-import { readFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 export const config = {
   keyPath:
@@ -25,7 +25,14 @@ export async function readApiKey(): Promise<string> {
     const message =
       err instanceof Error ? err.message : "Failed to read API key";
     throw new Error(
-      `Cannot read ProjectionLab API key from ${config.keyPath}: ${message}`,
+      `Cannot read ProjectionLab API key from ${config.keyPath}: ${message}. Run pl_setup to configure.`,
     );
   }
+}
+
+export async function writeApiKey(key: string): Promise<void> {
+  const dir = dirname(config.keyPath);
+  await mkdir(dir, { recursive: true });
+  await writeFile(config.keyPath, key.trim() + "\n", "utf-8");
+  await chmod(config.keyPath, 0o600);
 }
