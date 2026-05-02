@@ -2,9 +2,22 @@
 
 MCP server for [ProjectionLab](https://projectionlab.com) — export, snapshot, and restore your financial plans. Includes a built-in FIRE advisor knowledge base for analyzing Financial Independence scenarios.
 
+## Why this approach
+
+Most MCP servers that connect to third-party services ask you to paste API keys into config files, environment variables, or `.env` files. That key then lives on disk, gets passed through the MCP protocol, and travels through the AI conversation — where it can end up in logs, history, or training data.
+
+This server works differently:
+
+- **Your API key never leaves the browser.** The key is extracted from the ProjectionLab settings page, stored in the browser's `sessionStorage`, and used there. The MCP server never sees it. The AI never sees it. It doesn't exist in any config file, environment variable, or conversation log. Other ProjectionLab MCPs store the key in plaintext files on disk or pass it through environment variables.
+- **Everything runs in a browser you can see.** This server doesn't make hidden API calls on your behalf. It generates JavaScript that executes in a browser tab where ProjectionLab is open. You can watch every operation happen in real time — open DevTools, inspect network requests, see exactly what's being read or written. Nothing is opaque. Other approaches run headless browsers in the background where you can't observe what's happening.
+- **Zero infrastructure.** No bundled Chromium, no background daemons, no Firefox + GeckoDriver, no Rust toolchain. The only dependencies are the MCP SDK and zod. It works with whatever browser MCP you already have running.
+- **Snapshots are redacted automatically.** When you save financial data locally, any field named `key`, `apiKey`, or `pluginKey` is replaced with `[REDACTED]` before writing to disk.
+
+The trade-off is that you need a browser automation MCP running alongside this one. But for something as sensitive as your financial data, that transparency is worth it.
+
 ## Features
 
-- **Guided API key setup** — securely extracts and validates the key entirely in the browser; the key never enters the conversation
+- **Guided API key setup** — securely extracts and validates the key entirely in the browser
 - **Full data export** — returns a script that exports all plans, accounts, income, expenses, and settings
 - **Local snapshots** — save exports as timestamped JSON files with automatic API key redaction
 - **Snapshot restore** — generate scripts to restore plans and current finances from any snapshot
@@ -12,7 +25,7 @@ MCP server for [ProjectionLab](https://projectionlab.com) — export, snapshot, 
 
 ## Prerequisites
 
-This server does not talk to ProjectionLab directly. It generates JavaScript that must be executed in a browser where ProjectionLab is open. You need a browser automation MCP alongside this one:
+This server generates JavaScript that must be executed in a browser where ProjectionLab is open. You need a browser automation MCP alongside this one:
 
 - [Chrome DevTools MCP](https://github.com/anthropics/anthropic-quickstarts/tree/main/mcp-servers/chrome-devtools) or [Playwright MCP](https://github.com/anthropics/anthropic-quickstarts/tree/main/mcp-servers/playwright)
 - A [ProjectionLab Premium](https://projectionlab.com) account with Plugins enabled
