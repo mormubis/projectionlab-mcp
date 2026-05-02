@@ -27,23 +27,33 @@ or chrome devtools).
 - pl_list_snapshots: lists saved snapshots
 - pl_restore: reads a snapshot and returns JS strings to restore it in the browser
 
+## API key handling
+
+The API key is stored in a browser variable (window.__plKey) during pl_setup.
+All scripts reference this variable instead of the key value directly.
+NEVER include the raw API key in scripts or tool outputs.
+
+If a script throws "API key not set", the page was reloaded and window.__plKey
+was lost. Run pl_setup again to re-inject it.
+
 ## Browser workflow
 
 For data mutations (updating income, expenses, milestones, settings, etc.),
 write JavaScript using window.projectionlabPluginAPI and execute it in the browser.
-Always take a snapshot before destructive operations.
+Always take a snapshot before destructive operations. Always use window.__plKey
+for the key parameter — never hardcode the key value.
 
-Plugin API methods (all require { key } param):
-- exportData({ key }) — full data export
-- updateAccount(accountId, data, { key }) — update one account
-- restorePlans(plans, { key }) — replace all plans
-- restoreCurrentFinances(startingConditions, { key }) — replace current finances
-- validateApiKey({ key }) — check API key validity
+Plugin API methods (all require { key: window.__plKey }):
+- exportData({ key: window.__plKey }) — full data export
+- updateAccount(accountId, data, { key: window.__plKey }) — update one account
+- restorePlans(plans, { key: window.__plKey }) — replace all plans
+- restoreCurrentFinances(startingConditions, { key: window.__plKey }) — replace current finances
+- validateApiKey({ key: window.__plKey }) — check API key validity
 
 Common pattern for mutations:
-1. Export current data: await window.projectionlabPluginAPI.exportData({ key: "..." })
+1. Export current data: await window.projectionlabPluginAPI.exportData({ key: window.__plKey })
 2. Modify the data in JavaScript
-3. Restore: await window.projectionlabPluginAPI.restorePlans(modifiedPlans, { key: "..." })
+3. Restore: await window.projectionlabPluginAPI.restorePlans(modifiedPlans, { key: window.__plKey })
 
 ProjectionLab URLs:
 - Dashboard: https://app.projectionlab.com/

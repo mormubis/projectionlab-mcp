@@ -1,6 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { readApiKey } from "../config.js";
 import {
   saveSnapshot,
   listSnapshots,
@@ -81,6 +80,9 @@ export function registerSnapshotTools(server: McpServer): void {
         "Read a local snapshot file and return JavaScript strings to restore the data via the Plugin API.",
         "Execute each script in the browser using the Playwright or chrome devtools MCP.",
         "",
+        "The scripts use window.__plKey which is set during pl_setup.",
+        "If the page was reloaded since setup, run pl_setup again first.",
+        "",
         "Important: take a snapshot of the current state BEFORE restoring (run pl_export in the browser, then call pl_snapshot with the result).",
       ].join("\n"),
       inputSchema: z.object({
@@ -97,24 +99,17 @@ export function registerSnapshotTools(server: McpServer): void {
         );
       }
 
-      let key: string;
-      try {
-        key = await readApiKey();
-      } catch (err) {
-        return errorResult(err instanceof Error ? err.message : String(err));
-      }
-
       const scripts: string[] = [];
 
       if (snapshotData.plans !== undefined) {
         scripts.push(
-          `await window.projectionlabPluginAPI.restorePlans(${JSON.stringify(snapshotData.plans)}, { key: ${JSON.stringify(key)} })`,
+          `if (!window.__plKey) throw new Error("API key not set. Run pl_setup first."); await window.projectionlabPluginAPI.restorePlans(${JSON.stringify(snapshotData.plans)}, { key: window.__plKey })`,
         );
       }
 
       if (snapshotData.today !== undefined) {
         scripts.push(
-          `await window.projectionlabPluginAPI.restoreCurrentFinances(${JSON.stringify(snapshotData.today)}, { key: ${JSON.stringify(key)} })`,
+          `if (!window.__plKey) throw new Error("API key not set. Run pl_setup first."); await window.projectionlabPluginAPI.restoreCurrentFinances(${JSON.stringify(snapshotData.today)}, { key: window.__plKey })`,
         );
       }
 

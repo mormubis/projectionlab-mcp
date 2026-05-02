@@ -77,9 +77,9 @@ export function registerSetupTools(server: McpServer): void {
                 {
                   keyStored: true,
                   keyPath: config.keyPath,
-                  validateScript: `await window.projectionlabPluginAPI.validateApiKey({ key: ${JSON.stringify(apiKey)} })`,
+                  setupScript: `window.__plKey = ${JSON.stringify(apiKey)}; await window.projectionlabPluginAPI.validateApiKey({ key: window.__plKey })`,
                   instructions:
-                    "Execute the validateScript in the browser. If it returns without error, call pl_setup again with validationResult: true. If it throws, call with validationResult: false.",
+                    "Execute the setupScript in the browser. It stores the key in a browser variable and validates it. If it returns without error, call pl_setup again with validationResult: true. If it throws, call with validationResult: false.",
                 },
                 null,
                 2,
