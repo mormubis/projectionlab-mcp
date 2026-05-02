@@ -29,12 +29,16 @@ or chrome devtools).
 
 ## API key handling
 
-The API key is stored in a browser variable (window.__plKey) during pl_setup.
-All scripts reference this variable instead of the key value directly.
-NEVER include the raw API key in scripts or tool outputs.
+The API key lives only in the browser. During pl_setup, a script reads the key
+directly from the ProjectionLab settings page DOM and stores it in window.__plKey.
+The key never passes through MCP tool outputs or the conversation.
+
+All scripts reference window.__plKey — NEVER hardcode the key value.
+NEVER include the raw API key in scripts, tool outputs, or conversation messages.
 
 If a script throws "API key not set", the page was reloaded and window.__plKey
-was lost. Run pl_setup again to re-inject it.
+was lost. Run pl_setup again — it will navigate to the settings page and
+re-extract the key from the DOM.
 
 ## Browser workflow
 
