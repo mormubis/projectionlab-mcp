@@ -80,8 +80,8 @@ export function registerSnapshotTools(server: McpServer): void {
         "Read a local snapshot file and return JavaScript strings to restore the data via the Plugin API.",
         "Execute each script in the browser using the Playwright or chrome devtools MCP.",
         "",
-        "The scripts use window.__plKey which is set during pl_setup.",
-        "If the page was reloaded since setup, run pl_setup again first.",
+        "The scripts read the API key from sessionStorage, set during pl_setup.",
+        "If the browser tab was closed since setup, run pl_setup again first.",
         "",
         "Important: take a snapshot of the current state BEFORE restoring (run pl_export in the browser, then call pl_snapshot with the result).",
       ].join("\n"),
@@ -103,13 +103,13 @@ export function registerSnapshotTools(server: McpServer): void {
 
       if (snapshotData.plans !== undefined) {
         scripts.push(
-          `if (!window.__plKey) throw new Error("API key not set. Run pl_setup first."); await window.projectionlabPluginAPI.restorePlans(${JSON.stringify(snapshotData.plans)}, { key: window.__plKey })`,
+          `(() => { const k = sessionStorage.getItem('__plKey'); if (!k) throw new Error('API key not set. Run pl_setup first.'); return window.projectionlabPluginAPI.restorePlans(${JSON.stringify(snapshotData.plans)}, { key: k }); })()`,
         );
       }
 
       if (snapshotData.today !== undefined) {
         scripts.push(
-          `if (!window.__plKey) throw new Error("API key not set. Run pl_setup first."); await window.projectionlabPluginAPI.restoreCurrentFinances(${JSON.stringify(snapshotData.today)}, { key: window.__plKey })`,
+          `(() => { const k = sessionStorage.getItem('__plKey'); if (!k) throw new Error('API key not set. Run pl_setup first.'); return window.projectionlabPluginAPI.restoreCurrentFinances(${JSON.stringify(snapshotData.today)}, { key: k }); })()`,
         );
       }
 

@@ -29,35 +29,37 @@ or chrome devtools).
 
 ## API key handling
 
-The API key lives only in the browser. During pl_setup, a script reads the key
-directly from the ProjectionLab settings page DOM and stores it in window.__plKey.
-The key never passes through MCP tool outputs or the conversation.
+The API key lives only in the browser's sessionStorage. During pl_setup, a script
+reads the key directly from the ProjectionLab settings page DOM and stores it in
+sessionStorage. The key never passes through MCP tool outputs or the conversation.
 
-All scripts reference window.__plKey — NEVER hardcode the key value.
+All scripts read the key from sessionStorage — NEVER hardcode the key value.
 NEVER include the raw API key in scripts, tool outputs, or conversation messages.
 
-If a script throws "API key not set", the page was reloaded and window.__plKey
-was lost. Run pl_setup again — it will navigate to the settings page and
-re-extract the key from the DOM.
+The key persists across page navigations and reloads within the same tab.
+If a script throws "API key not set", the tab was closed since setup.
+Run pl_setup again to re-extract from the settings page.
 
 ## Browser workflow
 
 For data mutations (updating income, expenses, milestones, settings, etc.),
 write JavaScript using window.projectionlabPluginAPI and execute it in the browser.
-Always take a snapshot before destructive operations. Always use window.__plKey
-for the key parameter — never hardcode the key value.
+Always take a snapshot before destructive operations. Always read the key from
+sessionStorage — never hardcode the key value.
 
-Plugin API methods (all require { key: window.__plKey }):
-- exportData({ key: window.__plKey }) — full data export
-- updateAccount(accountId, data, { key: window.__plKey }) — update one account
-- restorePlans(plans, { key: window.__plKey }) — replace all plans
-- restoreCurrentFinances(startingConditions, { key: window.__plKey }) — replace current finances
-- validateApiKey({ key: window.__plKey }) — check API key validity
+Plugin API methods (all require the key from sessionStorage):
+  const key = sessionStorage.getItem('__plKey');
+- exportData({ key }) — full data export
+- updateAccount(accountId, data, { key }) — update one account
+- restorePlans(plans, { key }) — replace all plans
+- restoreCurrentFinances(startingConditions, { key }) — replace current finances
+- validateApiKey({ key }) — check API key validity
 
 Common pattern for mutations:
-1. Export current data: await window.projectionlabPluginAPI.exportData({ key: window.__plKey })
-2. Modify the data in JavaScript
-3. Restore: await window.projectionlabPluginAPI.restorePlans(modifiedPlans, { key: window.__plKey })
+1. const key = sessionStorage.getItem('__plKey');
+2. const data = await window.projectionlabPluginAPI.exportData({ key });
+3. // modify data
+4. await window.projectionlabPluginAPI.restorePlans(data.plans, { key });
 
 ProjectionLab URLs:
 - Dashboard: https://app.projectionlab.com/

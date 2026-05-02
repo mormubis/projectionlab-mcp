@@ -44,8 +44,8 @@ export function registerSetupTools(server: McpServer): void {
                     "  if (!input) throw new Error('Plugin API Key input not found. Make sure you are on the Plugins settings page.');",
                     "  const value = input.value;",
                     "  if (!value || value.includes('\\u2022')) throw new Error('Key is masked. Click the eye icon to reveal it first.');",
-                    "  window.__plKey = value;",
-                    "  return window.projectionlabPluginAPI.validateApiKey({ key: window.__plKey });",
+                    "  sessionStorage.setItem('__plKey', value);",
+                    "  return window.projectionlabPluginAPI.validateApiKey({ key: value });",
                     "})()",
                   ].join("\n"),
                   instructions: [
@@ -72,7 +72,7 @@ export function registerSetupTools(server: McpServer): void {
               type: "text",
               text: JSON.stringify(
                 {
-                  setupScript: `window.__plKey = ${JSON.stringify(apiKey)}; await window.projectionlabPluginAPI.validateApiKey({ key: window.__plKey })`,
+                  setupScript: `sessionStorage.setItem('__plKey', ${JSON.stringify(apiKey)}); await window.projectionlabPluginAPI.validateApiKey({ key: ${JSON.stringify(apiKey)} })`,
                   instructions:
                     "Execute the setupScript in the browser. If it returns without error, call pl_setup again with validationResult: true.",
                 },
