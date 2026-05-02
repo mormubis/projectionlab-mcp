@@ -2,39 +2,65 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { registerSessionTools } from "./tools/session.js";
-import { registerReadTools } from "./tools/read.js";
-import { registerWriteTools } from "./tools/write.js";
+import { registerSetupTools } from "./tools/setup.js";
+import { registerExportTools } from "./tools/export.js";
 import { registerSnapshotTools } from "./tools/snapshots.js";
-import { registerBootstrapTools } from "./tools/bootstrap.js";
+import { registerKnowledgeResource } from "./resources/knowledge.js";
 
 const server = new McpServer(
   {
     name: "finance",
-    version: "0.1.0",
+    version: "0.2.0",
   },
   {
     instructions: `
-This MCP server orchestrates ProjectionLab browser actions.
-It does NOT control the browser directly — it returns action sequences
-that you execute via a separate Playwright MCP server.
+This MCP server helps manage ProjectionLab financial plans. It provides setup,
+data export, and snapshot tools. All data mutations and simulations are done by
+writing JavaScript and executing it in the browser via a separate MCP (Playwright
+or chrome devtools).
 
-## Tool workflow
+## Tools
 
-Most tools are multi-turn:
-1. Call the tool (returns an action sequence with a requestId)
-2. Execute each step via the Playwright MCP
-3. Call the tool again with the requestId and the result
-4. Repeat until the response includes done: true
+- pl_setup: guided API key configuration (first-time setup)
+- pl_export: returns a JS string to export all data — execute it in the browser
+- pl_snapshot: saves export data to a local file (pass the browser result here)
+- pl_list_snapshots: lists saved snapshots
+- pl_restore: reads a snapshot and returns JS strings to restore it in the browser
 
-First-time setup: call pl_setup to open ProjectionLab settings,
-guide the user through enabling plugins, and store the API key.
+## Browser workflow
 
-Before using any tools, ensure ProjectionLab is open by calling pl_status
-or pl_open. The Plugin API must be available in the browser.
+For data mutations (updating income, expenses, milestones, settings, etc.),
+write JavaScript using window.projectionlabPluginAPI and execute it in the browser.
+Always take a snapshot before destructive operations.
 
-All write operations automatically create snapshots before modifying data.
-Use pl_list_snapshots and pl_restore to manage backups.
+Plugin API methods (all require { key } param):
+- exportData({ key }) — full data export
+- updateAccount(accountId, data, { key }) — update one account
+- restorePlans(plans, { key }) — replace all plans
+- restoreCurrentFinances(startingConditions, { key }) — replace current finances
+- validateApiKey({ key }) — check API key validity
+
+Common pattern for mutations:
+1. Export current data: await window.projectionlabPluginAPI.exportData({ key: "..." })
+2. Modify the data in JavaScript
+3. Restore: await window.projectionlabPluginAPI.restorePlans(modifiedPlans, { key: "..." })
+
+ProjectionLab URLs:
+- Dashboard: https://app.projectionlab.com/
+- Settings: https://app.projectionlab.com/settings
+- Plugins: https://app.projectionlab.com/settings/plugins
+- Plan: https://app.projectionlab.com/plan/{planId}
+
+## Running simulations
+
+Monte Carlo simulations and projections run inside ProjectionLab's UI, not via
+the Plugin API. To run and view simulations:
+1. Navigate to the plan URL in the browser
+2. Open the Chance of Success tab for Monte Carlo results
+3. Read or screenshot the milestone distribution, success rate, and charts
+4. The Plan tab shows the deterministic projection based on current assumptions
+
+This is fully supported via the browser MCP — navigate, click tabs, screenshot.
 
 ## FIRE advisor knowledge base
 
@@ -120,14 +146,14 @@ or delaying full retirement by 2-3 years.
 
 ### Reading ProjectionLab data
 
-When analyzing data from the pl_* tools:
+When analyzing data from exports:
 
-- startingConditions.accounts = current portfolio snapshot (savings, investments, balances)
+- today.savingsAccounts + today.investmentAccounts = current portfolio snapshot
 - plans[].milestones = life events and targets. Look for FI-related names.
-- plans[].incomeEvents = income streams. Note start/end dates and amounts.
+- plans[].income.events = income streams. Note start/end dates and amounts.
   Income events with limited date ranges or reduced amounts often indicate part-time
   or phased retirement strategies (Barista/Coast FIRE).
-- plans[].expenseEvents = spending categories. Sum these for annual expense estimates.
+- plans[].expenses.events = spending categories. Sum these for annual expense estimates.
 - Compare expense totals across plans to find the cheapest viable path to FI.
 - Plans without the primary income source (e.g. an "Unemployment" plan) model worst-case
   scenarios — these are stress tests.
@@ -138,15 +164,40 @@ When creating new plans, always:
 2. Set realistic income events with end dates matching the retirement target
 3. Account for healthcare costs if retiring before state pension age
 4. Model at least one pessimistic scenario (job loss, market downturn)
+
+### ProjectionLab best practices
+
+PLAN STRUCTURE:
+- Clone, don't rebuild. Start with one solid baseline plan, then clone for scenarios.
+- One variable per scenario. Each plan should change one major thing.
+- Use milestones, not hard dates. Bind income/expense start/end to milestones.
+
+INVESTMENT ASSUMPTIONS:
+- Use Historical Testing or Monte Carlo, not fixed rates, for long-term planning.
+- Check "Chance of Success" tab, not just the Plan tab.
+- Monte Carlo: use Random-Restart sampling with 500+ trials for stable results.
+
+CASH FLOW PRIORITIES:
+- Order matters — essentials first, then tax-advantaged, then taxable investments.
+- Use "mandatory" for non-negotiable goals (401k match, HSA contributions).
+- Emergency fund as a target mode, not unbounded.
+
+WITHDRAWAL STRATEGY:
+- Don't use the plain 4% rule for early retirement (40+ year horizon).
+- Guyton-Klinger or VPW are better for early retirees — they adapt to market conditions.
+
+MAINTENANCE:
+- Update balances quarterly.
+- Review plans annually.
+- Take snapshots before big changes.
 `.trim(),
   },
 );
 
-registerSessionTools(server);
-registerReadTools(server);
-registerWriteTools(server);
+registerSetupTools(server);
+registerExportTools(server);
 registerSnapshotTools(server);
-registerBootstrapTools(server);
+registerKnowledgeResource(server);
 
 async function main(): Promise<void> {
   const transport = new StdioServerTransport();

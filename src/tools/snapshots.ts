@@ -1,23 +1,11 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { readApiKey } from "../config.js";
-import { evaluate, sequence } from "../lib/actions.js";
 import {
-  exportDataScript,
-  restoreCurrentFinancesScript,
-  restorePlansScript,
-} from "../lib/plugin-api.js";
-import {
+  saveSnapshot,
   listSnapshots,
   loadSnapshot,
-  saveSnapshot,
 } from "../lib/snapshots.js";
-import { validateExport } from "../lib/validation.js";
-import {
-  completeOperation,
-  createOperation,
-  getOperation,
-} from "../lib/state.js";
 import type { CompleteAccountDataExport } from "../types/projectionlab.js";
 
 function errorResult(message: string) {
@@ -27,66 +15,42 @@ function errorResult(message: string) {
   };
 }
 
-function exportStep(key: string): ReturnType<typeof evaluate> {
-  return evaluate(
-    exportDataScript(key),
-    "Export all ProjectionLab data via Plugin API",
-    "Object with plans, startingConditions, progress, settings",
-  );
-}
-
 export function registerSnapshotTools(server: McpServer): void {
-  // -------------------------------------------------------------------------
-  // pl_snapshot
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // pl_snapshot — save exported data to a local file
+  // ---------------------------------------------------------------------------
   server.registerTool(
     "pl_snapshot",
     {
       title: "Save Snapshot",
       description:
-        "Export the current ProjectionLab data and save it as a local snapshot file. Multi-turn: step 1 exports data; step 2 saves the snapshot and returns the file path.",
+        "Save ProjectionLab export data as a local snapshot file. Pass the data you got from running the pl_export script in the browser. API keys are redacted before writing.",
       inputSchema: z.object({
+        data: z.unknown().describe("The export data from ProjectionLab (result of running the pl_export script)"),
         label: z.string().optional().describe("Optional label appended to the snapshot filename"),
-        requestId: z.string().optional(),
-        result: z.unknown().optional(),
       }),
     },
-    async (args) => {
-      const { label, requestId, result } = args;
-
-      if (!requestId) {
-        let key: string;
-        try {
-          key = await readApiKey();
-        } catch (err) {
-          return errorResult(err instanceof Error ? err.message : String(err));
-        }
-        const opId = createOperation("pl_snapshot", { label });
-        const seq = sequence("pl_snapshot", [exportStep(key)], { requestId: opId });
-        return { content: [{ type: "text" as const, text: JSON.stringify(seq, null, 2) }] };
+    async ({ data, label }) => {
+      if (!data || typeof data !== "object") {
+        return errorResult("data is required — pass the result of running the pl_export script in the browser");
       }
 
-      const op = getOperation(requestId);
-      if (!op) return errorResult(`Unknown or expired requestId: ${requestId}`);
-      completeOperation(requestId);
-
-      const { label: snapshotLabel } = op.data as { label?: string };
-      const snapshotPath = await saveSnapshot(result, snapshotLabel);
+      const path = await saveSnapshot(data, label);
 
       return {
         content: [
           {
             type: "text" as const,
-            text: JSON.stringify({ snapshotPath, done: true }, null, 2),
+            text: JSON.stringify({ path }, null, 2),
           },
         ],
       };
     },
   );
 
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   // pl_list_snapshots
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
   server.registerTool(
     "pl_list_snapshots",
     {
@@ -99,129 +63,74 @@ export function registerSnapshotTools(server: McpServer): void {
     async () => {
       const snapshots = await listSnapshots();
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(snapshots, null, 2) }],
+        content: [
+          { type: "text" as const, text: JSON.stringify(snapshots, null, 2) },
+        ],
       };
     },
   );
 
-  // -------------------------------------------------------------------------
-  // pl_restore
-  // -------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // pl_restore — read a snapshot and return JS scripts to restore it
+  // ---------------------------------------------------------------------------
   server.registerTool(
     "pl_restore",
     {
-      title: "Restore Snapshot",
-      description:
-        "Restore ProjectionLab data from a local snapshot file. A backup of the current state is saved before restoring. Multi-turn: step 1 loads the snapshot and exports current data for backup; step 2 saves the backup and emits restore actions.",
+      title: "Restore from Snapshot",
+      description: [
+        "Read a local snapshot file and return JavaScript strings to restore the data via the Plugin API.",
+        "Execute each script in the browser using the Playwright or chrome devtools MCP.",
+        "",
+        "Important: take a snapshot of the current state BEFORE restoring (run pl_export in the browser, then call pl_snapshot with the result).",
+      ].join("\n"),
       inputSchema: z.object({
         snapshotPath: z.string().describe("Absolute path to the snapshot file to restore"),
-        requestId: z.string().optional(),
-        result: z.unknown().optional(),
       }),
     },
-    async (args) => {
-      const { snapshotPath, requestId, result } = args;
-
-      if (!requestId) {
-        // Load and validate the target snapshot first
-        let snapshotData: unknown;
-        try {
-          snapshotData = await loadSnapshot(snapshotPath);
-        } catch (err) {
-          return errorResult(
-            `Cannot load snapshot from ${snapshotPath}: ${err instanceof Error ? err.message : String(err)}`,
-          );
-        }
-
-        let key: string;
-        try {
-          key = await readApiKey();
-        } catch (err) {
-          return errorResult(err instanceof Error ? err.message : String(err));
-        }
-
-        const opId = createOperation("pl_restore", {
-          snapshotPath,
-          snapshotData,
-        });
-
-        // Export current data so step 2 can back it up before restoring
-        const seq = sequence("pl_restore", [exportStep(key)], { requestId: opId });
-        return { content: [{ type: "text" as const, text: JSON.stringify(seq, null, 2) }] };
+    async ({ snapshotPath }) => {
+      let snapshotData: CompleteAccountDataExport;
+      try {
+        snapshotData = (await loadSnapshot(snapshotPath)) as CompleteAccountDataExport;
+      } catch (err) {
+        return errorResult(
+          `Cannot load snapshot from ${snapshotPath}: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
-
-      // Step 2 — backup current data, restore from snapshot
-      const op = getOperation(requestId);
-      if (!op) return errorResult(`Unknown or expired requestId: ${requestId}`);
-
-      // Save current state as backup before overwriting
-      const backupPath = await saveSnapshot(result, "pre-restore-backup");
 
       let key: string;
       try {
         key = await readApiKey();
       } catch (err) {
-        completeOperation(requestId);
         return errorResult(err instanceof Error ? err.message : String(err));
       }
 
-      const { snapshotPath: storedPath, snapshotData } = op.data as {
-        snapshotPath: string;
-        snapshotData: CompleteAccountDataExport;
-      };
-
-      // Validate snapshot data before restoring
-      const validation = validateExport(snapshotData);
-      if (!validation.valid) {
-        completeOperation(requestId);
-        return errorResult(`Snapshot validation failed: ${validation.errors.join("; ")}`);
-      }
-
-      completeOperation(requestId);
-
-      const restoreSteps = [];
+      const scripts: string[] = [];
 
       if (snapshotData.plans !== undefined) {
-        restoreSteps.push(
-          evaluate(
-            restorePlansScript(key, snapshotData.plans),
-            "Restore plans from snapshot",
-            "Plans restored successfully",
-          ),
+        scripts.push(
+          `await window.projectionlabPluginAPI.restorePlans(${JSON.stringify(snapshotData.plans)}, { key: ${JSON.stringify(key)} })`,
         );
       }
 
-      if (snapshotData.startingConditions !== undefined) {
-        restoreSteps.push(
-          evaluate(
-            restoreCurrentFinancesScript(key, snapshotData.startingConditions),
-            "Restore starting conditions (accounts) from snapshot",
-            "Starting conditions restored successfully",
-          ),
+      if (snapshotData.today !== undefined) {
+        scripts.push(
+          `await window.projectionlabPluginAPI.restoreCurrentFinances(${JSON.stringify(snapshotData.today)}, { key: ${JSON.stringify(key)} })`,
         );
       }
 
-      if (restoreSteps.length === 0) {
-        return errorResult("Snapshot contains no restorable data (no plans or startingConditions)");
+      if (scripts.length === 0) {
+        return errorResult("Snapshot contains no restorable data (no plans or today)");
       }
-
-      const verifyStep = evaluate(
-        exportDataScript(key),
-        "Verify restore was applied",
-        "Exported data matches restored snapshot",
-      );
-
-      const seq = sequence("pl_restore", restoreSteps, {
-        verify: verifyStep,
-        done: true,
-      });
 
       return {
         content: [
           {
             type: "text" as const,
             text: JSON.stringify(
-              { backupPath, restoredFrom: storedPath, ...seq },
+              {
+                scripts,
+                instructions: "Execute each script in the browser, in order.",
+              },
               null,
               2,
             ),
