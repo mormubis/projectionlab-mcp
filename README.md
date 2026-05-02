@@ -12,6 +12,7 @@ This server works differently:
 - **Everything runs in a browser you can see.** This server doesn't make hidden API calls on your behalf. It generates JavaScript that executes in a browser tab where ProjectionLab is open. You can watch every operation happen in real time — open DevTools, inspect network requests, see exactly what's being read or written. Nothing is opaque. Other approaches run headless browsers in the background where you can't observe what's happening.
 - **Zero infrastructure.** No bundled Chromium, no background daemons, no Firefox + GeckoDriver, no Rust toolchain. The only dependencies are the MCP SDK and zod. It works with whatever browser MCP you already have running.
 - **Snapshots are redacted automatically.** When you save financial data locally, any field named `key`, `apiKey`, or `pluginKey` is replaced with `[REDACTED]` before writing to disk.
+- **Published with provenance.** Every release is built and published from GitHub Actions via [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/). No long-lived tokens, no manual publishes. You can verify that the package on npm was built from this repo — `npm audit signatures` confirms the cryptographic link between the published tarball and the exact commit that produced it.
 
 The trade-off is that you need a browser automation MCP running alongside this one. But for something as sensitive as your financial data, that transparency is worth it.
 
