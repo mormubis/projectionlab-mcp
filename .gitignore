@@ -1,3 +1,16 @@
+# dependencies
 node_modules/
+
+# build output
 dist/
 *.tgz
+
+# environment
+.env
+.env.*
+
+# os
+.DS_Store
+
+# logs
+*.log

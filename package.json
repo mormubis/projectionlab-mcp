@@ -1,11 +1,29 @@
 {
-  "name": "finance",
+  "name": "@mormubis/projectionlab-mcp",
   "version": "0.2.0",
+  "description": "MCP server for ProjectionLab — export, snapshot, and restore financial plans with a built-in FIRE advisor knowledge base.",
   "type": "module",
-  "private": true,
-  "bin": {
-    "finance": "./dist/index.js"
+  "license": "MIT",
+  "author": "Adrian (https://github.com/mormubis)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mormubis/projectionlab-mcp.git"
   },
+  "homepage": "https://github.com/mormubis/projectionlab-mcp",
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "projectionlab",
+    "fire",
+    "financial-independence",
+    "financial-planning"
+  ],
+  "bin": {
+    "projectionlab-mcp": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",

@@ -29,12 +29,19 @@ or chrome devtools).
 
 ## API key handling
 
-The API key lives only in the browser's sessionStorage. During pl_setup, a script
-reads the key directly from the ProjectionLab settings page DOM and stores it in
-sessionStorage. The key never passes through MCP tool outputs or the conversation.
+The API key lives only in the browser's sessionStorage. During pl_setup, the
+extractScript reads the key from the ProjectionLab settings page DOM, stores it
+in sessionStorage, and validates it — all inside the browser. The script returns
+only a boolean (true/false), never the key itself.
 
-All scripts read the key from sessionStorage — NEVER hardcode the key value.
-NEVER include the raw API key in scripts, tool outputs, or conversation messages.
+CRITICAL: NEVER extract the API key yourself. NEVER use evaluate_script or any
+other tool to read the key from the DOM or sessionStorage. NEVER pass the key
+as a parameter to any tool. The extractScript is the only code that should touch
+the key. If you read the key into the conversation, it becomes visible in logs
+and history — defeating the entire purpose of the security design.
+
+All other scripts (export, restore, mutations) read the key from sessionStorage
+at runtime — NEVER hardcode the key value in any script you write.
 
 The key persists across page navigations and reloads within the same tab.
 If a script throws "API key not set", the tab was closed since setup.
@@ -66,6 +73,12 @@ ProjectionLab URLs:
 - Settings: https://app.projectionlab.com/settings
 - Plugins: https://app.projectionlab.com/settings/plugins
 - Plan: https://app.projectionlab.com/plan/{planId}
+
+IMPORTANT: ProjectionLab is a single-page app that takes a few seconds to fully
+load after navigation. Always wait for the page content to appear before running
+scripts — use wait_for with relevant text (e.g. "Plugin API Key", "Dashboard")
+or take a snapshot to confirm the page is ready. Running scripts too early will
+fail because the DOM or Plugin API won't be available yet.
 
 ## Running simulations
 
