@@ -1,6 +1,6 @@
 {
   "name": "@mormubis/projectionlab-mcp",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "MCP server for ProjectionLab — export, snapshot, and restore financial plans with a built-in FIRE advisor knowledge base.",
   "type": "module",
   "license": "MIT",
