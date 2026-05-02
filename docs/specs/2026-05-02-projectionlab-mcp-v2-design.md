@@ -52,10 +52,10 @@ The MCP runs as a stdio process. No daemon, no HTTP server, no browser dependenc
 Guided API key configuration. Three-step flow:
 
 1. Call with no args — returns instructions to navigate to ProjectionLab settings page and enable plugins
-2. Call with `apiKey` — validates format, stores key to `~/.config/projectionlab/key` (mode 0600), returns JavaScript string to validate the key via `validateApiKey`
-3. Call with `requestId` + validation result — confirms success or failure
+2. Call with `apiKey` — stores key to `~/.config/projectionlab/key` (mode 0600), returns JavaScript string to validate the key via `validateApiKey`
+3. Call with `validationResult` — confirms success or failure
 
-This is the only multi-step tool. It's justified because setup is a one-time onboarding flow.
+No format validation on the key — the browser validation in step 3 catches invalid keys. This is the only multi-step tool. It's justified because setup is a one-time onboarding flow.
 
 ### pl_export
 
