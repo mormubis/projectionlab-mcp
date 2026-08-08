@@ -25,7 +25,7 @@ export function registerSnapshotTools(server: McpServer): void {
       description:
         "Save ProjectionLab export data as a local snapshot file. Pass the data you got from running the pl_export script in the browser. API keys are redacted before writing.",
       inputSchema: z.object({
-        data: z.unknown().describe("The export data from ProjectionLab (result of running the pl_export script)"),
+        data: z.record(z.string(), z.unknown()).describe("The export data from ProjectionLab (result of running the pl_export script)"),
         label: z.string().optional().describe("Optional label appended to the snapshot filename"),
       }),
     },
